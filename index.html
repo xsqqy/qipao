@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f5f5f7">
+<title>Ann · 曲曲机气泡生成器</title>
+<style>
+:root{
+  --accent:#000; --bg:#f5f5f7; --card:#fff; --line:#e5e5ea;
+  --muted:#8e8e93; --text:#1c1c1e; --danger:#ff3b30;
+  --grid:linear-gradient(45deg,#f0f0f3 25%,transparent 25%,transparent 75%,#f0f0f3 75%);
+  --safe-top:env(safe-area-inset-top);
+  --safe-bottom:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  font-size:14px;line-height:1.5;
+  overscroll-behavior:none;
+}
+body{padding-bottom:calc(20px + var(--safe-bottom))}
+
+/* 顶部导航 */
+.nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(245,245,247,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--line);
+  padding-top:var(--safe-top);
+}
+.nav-inner{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;height:44px;
+}
+.nav-title{font-size:17px;font-weight:600}
+.nav-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.05);cursor:pointer;font-size:16px;
+}
+
+/* 主容器 */
+.wrap{max-width:100%;padding:12px;display:flex;flex-direction:column;gap:12px}
+
+.card{
+  background:var(--card);border-radius:14px;padding:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.card h2{
+  font-size:15px;font-weight:600;margin:0 0 12px;
+  display:flex;align-items:center;gap:6px;
+}
+.card h2 .badge{
+  font-size:11px;font-weight:400;color:var(--muted);
+  background:rgba(0,0,0,.05);padding:2px 8px;border-radius:10px;
+}
+
+/* Tab 切换 */
+.tabs{
+  display:flex;background:rgba(0,0,0,.05);border-radius:10px;padding:3px;
+  margin-bottom:14px;
+}
+.tab-btn{
+  flex:1;padding:8px 12px;border:none;background:transparent;
+  font-size:13px;color:var(--muted);border-radius:8px;cursor:pointer;
+  font-family:inherit;
+}
+.tab-btn.active{background:var(--card);color:var(--text);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+/* ---------- 预览区（聊天流） ---------- */
+.preview-stage{
+  border-radius:12px;border:1px solid var(--line);
+  background-color:#fff;
+  background-image:var(--grid),var(--grid);
+  background-position:0 0,10px 10px;background-size:20px 20px;
+  height:280px;overflow-y:auto;overflow-x:hidden;
+  padding:10px 12px;
+  -webkit-overflow-scrolling:touch;
+  position:relative;
+}
+.flow-list{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.chat-row{display:flex;align-items:flex-end;gap:8px;width:100%}
+.chat-row.is-me{flex-direction:row-reverse}
+.chat-avatar{
+  width:32px;height:32px;border-radius:50%;background:#e5e5ea;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:var(--muted);flex-shrink:0;
+}
+.chat-bubble-wrap{max-width:75%;position:relative}
+.chat-bubble{
+  display:inline-block;width:auto;height:auto;
+  font-size:14px;overflow:visible;
+  min-width:0;max-width:100%;
+}
+.chat-bubble .bubble-text{outline:1px dashed rgba(0,0,0,.2);min-height:1em;outline-offset:-2px}
+.preview-hint{font-size:11px;color:var(--muted);margin-top:8px}
+
+.preview-tools{
+  display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;
+}
+.preview-tools .btn{
+  padding:6px 10px;font-size:12px;
+}
+.preview-tools .btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ---------- 切图台 ---------- */
+.slicer-wrap{
+  position:relative;height:200px;border:1px solid var(--line);border-radius:10px;
+  background-color:#fff;background-image:var(--grid),var(--grid);
+  background-position:0 0,10px 10px;background-size:20px 20px;
+  overflow:hidden;touch-action:none;
+}
+.canvas{position:absolute}
+.canvas img{width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+.region{position:absolute;pointer-events:none}
+.r-center{background:rgba(34,197,94,.14);border:1px dashed rgba(21,128,61,.6)}
+.tag{position:absolute;font-size:10px;font-weight:700;color:#15803d;
+  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap}
+
+/* 红线：热区 13px，描边画在正中间 */
+.line{position:absolute;touch-action:none;z-index:10}
+.line::before{content:'';position:absolute;background:rgba(220,38,38,.9)}
+.line-h{left:0;width:100%;height:13px;margin-top:-6px;cursor:ns-resize}
+.line-h::before{left:0;top:6px;width:100%;height:1px}
+.line-v{top:0;height:100%;width:13px;margin-left:-6px;cursor:ew-resize}
+.line-v::before{top:0;left:6px;width:1px;height:100%}
+.line::after{content:attr(data-label);position:absolute;font-size:10px;color:#dc2626;
+  background:rgba(255,255,255,.9);padding:0 3px;border-radius:3px;font-weight:600}
+.line-h::after{left:4px;top:-8px}
+.line-v::after{top:4px;left:10px}
+
+.img-info{font-size:11px;color:var(--muted);margin-top:8px}
+
+/* ---------- 数值控件 ---------- */
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:12px}
+.quad-item{min-width:0}
+.num-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.num-row input[type=number]{
+  width:52px;padding:3px 5px;border:1px solid var(--line);border-radius:6px;
+  font:inherit;font-size:12px;text-align:right;background:#fafafa;
+}
+input[type=range]{width:100%;margin:0;accent-color:var(--accent)}
+
+/* 按钮 */
+.btn{
+  padding:8px 14px;border:1px solid var(--line);background:#fafafa;
+  border-radius:8px;font-size:13px;cursor:pointer;color:var(--text);
+  font-family:inherit;
+}
+.btn:active{background:#f0f0f0}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.btn.primary:active{opacity:.85}
+.btn.danger{color:var(--danger);border-color:rgba(255,59,48,.3);background:#fff5f5}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* 上传区 */
+.upload-area{
+  border:1.5px dashed var(--line);border-radius:10px;padding:16px;
+  text-align:center;background:#fafafa;cursor:pointer;
+}
+.upload-area:active{background:#f0f0f0}
+.upload-icon{font-size:24px;margin-bottom:4px}
+.upload-text{font-size:12px;color:var(--muted)}
+.upload-has-img{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid var(--line);border-radius:10px;padding:10px;
+  background:#fafafa;
+}
+.upload-thumb{
+  width:48px;height:48px;border-radius:6px;background:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  border:1px solid var(--line);
+}
+.upload-thumb img{max-width:100%;max-height:100%}
+.upload-info{flex:1;min-width:0}
+.upload-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upload-size{font-size:11px;color:var(--muted)}
+.upload-actions{display:flex;gap:6px}
+
+.url-input-wrap{display:flex;gap:6px;margin-top:8px}
+.url-input-wrap input{
+  flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;font-size:12px;background:#fafafa;
+}
+.url-input-wrap input:focus{outline:none;border-color:var(--accent)}
+
+/* 翻转按钮 */
+.flip-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:10px;padding:10px 12px;background:#fafafa;border-radius:8px;
+}
+.flip-hint{font-size:12px;color:var(--muted)}
+
+/* 样式区 */
+.style-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.style-field label{
+  font-size:12px;color:var(--muted);display:block;margin-bottom:4px;
+}
+.style-field input[type=text],
+.style-field input[type=color]{
+  width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;font-size:13px;background:#fafafa;
+}
+.style-field input[type=color]{padding:2px;height:34px;cursor:pointer}
+
+/* 装饰素材 */
+.mat-upload-row{display:flex;gap:6px;margin-bottom:10px}
+.mat-list{
+  display:flex;flex-wrap:wrap;gap:6px;
+  padding:8px;background:#fafafa;border-radius:8px;min-height:52px;
+}
+.material-item{
+  position:relative;width:40px;height:40px;border-radius:6px;
+  border:2px solid transparent;background:#fff;overflow:hidden;cursor:pointer;
+}
+.material-item.active{border-color:var(--accent)}
+.material-item img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.material-item .mat-del{
+  position:absolute;top:-2px;right:-2px;width:16px;height:16px;
+  background:var(--danger);color:#fff;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:bold;line-height:1;
+}
+.material-empty{
+  font-size:11px;color:var(--muted);padding:8px;text-align:center;width:100%;
+}
+.mat-count{font-size:11px;color:var(--muted);margin-left:auto}
+
+.mat-controls{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+  display:none;
+}
+.mat-controls.show{display:block}
+.mat-controls .style-field{margin-bottom:10px}
+.mat-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* 素材在预览气泡上 */
+.bubble-material{
+  position:absolute;pointer-events:auto;cursor:move;
+  touch-action:none;user-select:none;-webkit-user-drag:none;
+  z-index:5;
+}
+.bubble-material img{
+  width:100%;height:100%;display:block;
+  pointer-events:none;-webkit-user-drag:none;
+}
+.bubble-material.mat-selected{
+  outline:2px dashed var(--accent);outline-offset:2px;border-radius:4px;
+}
+
+/* 代码区 */
+.code-wrap{
+  background:#0f172a;color:#e2e8f0;border-radius:10px;
+  padding:12px;overflow:auto;max-height:300px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;
+  -webkit-user-select:all;user-select:all;
+}
+.code-btns{display:flex;gap:8px;margin-top:10px}
+
+/* 选择器输入 */
+.selector-input{
+  width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;font-size:13px;background:#fafafa;margin-bottom:10px;
+}
+.selector-input:focus{outline:none;border-color:var(--accent)}
+
+/* 预设 */
+.preset-box{
+  border:1px dashed var(--line);border-radius:8px;padding:10px;
+  margin-top:10px;background:#fafafa;
+}
+.preset-box summary{
+  list-style:none;font-size:12px;font-weight:500;color:var(--accent);cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.preset-box summary::-webkit-details-marker{display:none}
+.preset-body{margin-top:10px}
+.preset-body select{
+  width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;font-size:12px;background:#fff;margin-bottom:8px;
+}
+.preset-row{display:flex;gap:6px;margin-bottom:6px}
+.preset-row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12px}
+.preset-msg{font-size:11px;color:#15803d;margin-top:6px;min-height:1em}
+.preset-msg.err{color:#dc2626}
+
+/* 教程遮罩 */
+.tutorial-overlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000;
+  background:rgba(0,0,0,.75);display:none;
+  align-items:center;justify-content:center;padding:24px;
+}
+.tutorial-overlay.show{display:flex}
+.tutorial-card{
+  background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;
+  text-align:center;
+}
+.tutorial-card h3{font-size:18px;margin:0 0 8px}
+.tutorial-card p{font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.6}
+.tutorial-steps{text-align:left;margin:12px 0}
+.tutorial-steps div{font-size:13px;padding:6px 0;color:#333}
+.tutorial-steps div::before{content:'✓  ';color:#34c759;font-weight:bold}
+
+/* Toast */
+.toast{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(0,0,0,.8);color:#fff;padding:10px 18px;border-radius:10px;
+  font-size:13px;z-index:2000;pointer-events:none;opacity:0;
+  transition:opacity .25s;
+}
+.toast.show{opacity:1}
+
+/* section 间距 */
+.section-title{
+  font-size:12px;font-weight:600;color:var(--muted);
+  margin:0 0 8px;padding:0 2px;text-transform:uppercase;letter-spacing:.3px;
+}
+.mt-12{margin-top:12px}
+.mt-8{margin-top:8px}
+
+/* 隐藏文件输入 */
+#fileInput,#matFileInput{display:none}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="nav">
+  <div class="nav-inner">
+    <div class="nav-icon" onclick="history.back()">‹</div>
+    <div class="nav-title">Ann · 气泡生成器</div>
+    <div class="nav-icon" onclick="showTutorial()">?</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- 预览卡片 -->
+  <div class="card" id="previewCard">
+    <h2>预览效果 <span class="badge" id="sideLabel">对方</span></h2>
+    <div class="preview-stage" id="previewStage">
+      <div class="flow-list" id="flowList">
+        <!-- 对方气泡 1（短） -->
+        <div class="chat-row" data-side="ta" data-bubble-idx="0">
+          <div class="chat-avatar">TA</div>
+          <div class="chat-bubble-wrap">
+            <div class="chat-bubble ta-bubble bubble-0"><div class="bubble-text" contenteditable="false">嗯</div></div>
+          </div>
+        </div>
+        <!-- 对方气泡 2（中） -->
+        <div class="chat-row" data-side="ta" data-bubble-idx="1">
+          <div class="chat-avatar">TA</div>
+          <div class="chat-bubble-wrap">
+            <div class="chat-bubble ta-bubble bubble-1"><div class="bubble-text" contenteditable="false">好的，我知道了</div></div>
+          </div>
+        </div>
+        <!-- 对方气泡 3（长） -->
+        <div class="chat-row" data-side="ta" data-bubble-idx="2">
+          <div class="chat-avatar">TA</div>
+          <div class="chat-bubble-wrap">
+            <div class="chat-bubble ta-bubble bubble-2"><div class="bubble-text" contenteditable="false">这条消息长一点，看看气泡被撑开之后，四个角有没有被保护住，尾巴有没有变形。</div></div>
+          </div>
+        </div>
+        <!-- 我的气泡 1（短） -->
+        <div class="chat-row is-me" data-side="me" data-bubble-idx="0">
+          <div class="chat-avatar">我</div>
+          <div class="chat-bubble-wrap">
+            <div class="chat-bubble me-bubble bubble-0"><div class="bubble-text" contenteditable="false">好</div></div>
+          </div>
+        </div>
+        <!-- 我的气泡 2（长） -->
+        <div class="chat-row is-me" data-side="me" data-bubble-idx="1">
+          <div class="chat-avatar">我</div>
+          <div class="chat-bubble-wrap">
+            <div class="chat-bubble me-bubble bubble-1"><div class="bubble-text" contenteditable="false">我这边也测试一下长消息的效果，确保切割后的拉伸区工作正常。</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="preview-hint">这就是气泡在聊天页里的真实效果。最短那条有多大，全看内边距。</p>
+    <div class="preview-tools">
+      <button class="btn on" id="btnChatView">聊天流</button>
+      <button class="btn" id="btnResetAll">重置参数</button>
+    </div>
+  </div>
+
+  <!-- 左右切换 -->
+  <div class="tabs">
+    <button class="tab-btn active" data-side="ta">对方气泡</button>
+    <button class="tab-btn" data-side="me">我的气泡</button>
+  </div>
+
+  <!-- 气泡素材上传 -->
+  <div class="card">
+    <h2>气泡素材</h2>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📤</div>
+      <div class="upload-text">点击上传气泡图片</div>
+    </div>
+    <div class="upload-has-img" id="hasImgArea" style="display:none">
+      <div class="upload-thumb"><img id="uploadThumb" alt=""></div>
+      <div class="upload-info">
+        <div class="upload-name" id="uploadName">bubble.png</div>
+        <div class="upload-size" id="uploadSize">0 × 0 px</div>
+      </div>
+      <div class="upload-actions">
+        <button class="btn small danger" id="btnRemoveImg">删除</button>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div class="url-input-wrap">
+      <input type="text" id="urlInput" placeholder="或粘贴图片链接 URL" spellcheck="false">
+      <button class="btn small" id="btnUrlImport">导入</button>
+    </div>
+
+    <div class="flip-row">
+      <span class="flip-hint" id="flipHint">对方 → 我的</span>
+      <button class="btn small primary" id="flipBtn">⇆ 翻转到对侧</button>
+    </div>
+  </div>
+
+  <!-- 切割线 -->
+  <div class="card">
+    <h2>切割线 <span class="badge">拖动红线</span></h2>
+    <div class="slicer-wrap" id="slicer">
+      <div class="canvas" id="canvas">
+        <img id="slicerImg" alt="">
+        <div class="region r-center" id="rCenter"><span class="tag">拉伸区</span></div>
+        <div class="line line-h" id="line-t" data-edge="t" data-label="上"></div>
+        <div class="line line-h" id="line-b" data-edge="b" data-label="下"></div>
+        <div class="line line-v" id="line-l" data-edge="l" data-label="左"></div>
+        <div class="line line-v" id="line-r" data-edge="r" data-label="右"></div>
+      </div>
+    </div>
+    <div class="img-info" id="imgInfo">—</div>
+
+    <div class="section-title mt-12">切割数值（源图像素）</div>
+    <div class="quad" id="sliceQuad"></div>
+  </div>
+
+  <!-- 显示倍率 & 内边距 -->
+  <div class="card">
+    <h2>显示与内边距</h2>
+    <div class="style-row">
+      <div class="style-field">
+        <label>显示倍率 <span id="scaleVal">1</span></label>
+        <input type="range" id="scaleRange" min="0.1" max="2" step="0.05" value="1">
+      </div>
+      <div class="style-field">
+        <label>文字颜色</label>
+        <input type="color" id="fontColor" value="#000000">
+      </div>
+    </div>
+    <div class="style-row mt-8">
+      <div class="style-field">
+        <label>字号 (px)</label>
+        <input type="text" id="fontSize" value="14">
+      </div>
+      <div class="style-field">
+        <label>填充方式</label>
+        <select id="repeatMode" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12px;background:#fafafa">
+          <option value="stretch">stretch 拉伸</option>
+          <option value="repeat">repeat 平铺</option>
+          <option value="round">round 取整平铺</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title mt-12">内边距 Padding（文字离边距）</div>
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn small on" id="btnLinkPad">跟着边角走：开</button>
+    </div>
+    <div class="quad" id="padQuad"></div>
+  </div>
+
+  <!-- 装饰素材 -->
+  <div class="card">
+    <h2>装饰素材 <span class="badge">最多6个</span></h2>
+    <div class="mat-upload-row">
+      <button class="btn small" id="btnMatUpload">+ 上传素材</button>
+      <button class="btn small" id="btnMatUrl">+ URL导入</button>
+      <span class="mat-count" id="materialCountHint">0 / 6</span>
+    </div>
+    <input type="file" id="matFileInput" accept="image/*" multiple>
+    <div class="mat-list" id="materialList">
+      <div class="material-empty">还没有素材，点上方按钮添加</div>
+    </div>
+
+    <div class="mat-controls" id="materialControls">
+      <div class="style-row">
+        <div class="style-field">
+          <label>大小 <span id="matScaleVal">1.00x</span></label>
+          <input type="range" id="matScaleRange" min="0.1" max="3" step="0.05" value="1">
+        </div>
+        <div class="style-field">
+          <label>旋转 <span id="matRotateVal">0°</span></label>
+          <input type="range" id="matRotateRange" min="-180" max="180" step="1" value="0">
+        </div>
+      </div>
+      <div class="mat-btns">
+        <button class="btn small" id="btnMatUp">上移一层</button>
+        <button class="btn small" id="btnMatDown">下移一层</button>
+        <button class="btn small" id="btnMatCopy">复制到对侧</button>
+        <button class="btn small danger" id="btnMatDelete">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSS 输出 -->
+  <div class="card">
+    <h2>生成 CSS</h2>
+    <input type="text" class="selector-input" id="selectorInput" value=".yoww-bubble" placeholder="CSS 选择器，如 .yoww-bubble">
+
+    <details class="preset-box" id="presetBox">
+      <summary>预设管理 ▾</summary>
+      <div class="preset-body">
+        <select id="presetSel"></select>
+        <div class="preset-row">
+          <input type="text" id="presetName" placeholder="预设名，如「我方气泡」" spellcheck="false">
+          <button class="btn small primary" id="btnPresetSave">保存</button>
+          <button class="btn small danger" id="btnPresetDel">删除</button>
+        </div>
+        <p class="preset-msg" id="presetMsg"></p>
+      </div>
+    </details>
+
+    <pre class="code-wrap" id="codePre">/* 上传图片后自动生成 */</pre>
+    <div class="code-btns">
+      <button class="btn primary" id="btnCopyCSS">复制 CSS</button>
+      <button class="btn" id="btnDownloadCSS">下载 .css</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- 教程 -->
+<div class="tutorial-overlay" id="tutorialOverlay">
+  <div class="tutorial-card">
+    <h3>👋 欢迎使用</h3>
+    <p>上传气泡图 → 拖红线定切割区 → 自动生成 CSS</p>
+    <div class="tutorial-steps">
+      <div>上传气泡图片（支持URL）</div>
+      <div>拖动四条红线确定可拉伸区域</div>
+      <div>实时预览气泡效果</div>
+      <div>复制生成的CSS代码</div>
+    </div>
+    <button class="btn primary" onclick="hideTutorial()" style="width:100%;margin-top:12px">开始使用</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ========== 默认素材：120x120 带左下尾巴的气泡 ========== */
+var DEFAULT_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>" +
+  "<defs><linearGradient id='g' gradientUnits='userSpaceOnUse' x1='0' y1='0' x2='120' y2='120'>" +
+  "<stop offset='0' stop-color='#7b61ff'/><stop offset='1' stop-color='#ff8fb1'/>" +
+  "</linearGradient></defs>" +
+  "<g fill='url(#g)'>" +
+  "<rect x='4' y='4' width='112' height='100' rx='28'/>" +
+  "<path d='M30 90 L10 118 L44 103 Z'/>" +
+  "</g></svg>";
+var DEFAULT_IMG = 'data:image/svg+xml,' + encodeURIComponent(DEFAULT_SVG).replace(/'/g, '%27');
+
+var EDGES = [['t','上'],['r','右'],['b','下'],['l','左']];
+var STORE_KEY = 'annBubble.v2';
+var PRESET_KEY = 'annBubble.presets.v2';
+var MAX_IMG = 300 * 1024;
+var MAX_MATERIALS = 6;
+var AIM_EDGE = 16; // 目标边角厚度（px），自动倍率基准
+
+var _matIdCounter = 1;
+
+/* ========== 状态 ========== */
+function defaultBubble(){
+  return {
+    imageData: '',
+    natW: 0, natH: 0,
+    url: '',
+    slice: { t:32, r:32, b:40, l:48 },
+    pad:   { t:12, r:16, b:14, l:18 },
+    scale: 1,
+    scaleAuto: true,
+    padLinked: true,
+    fontSize: 14,
+    fontColor: '#ffffff',
+    repeat: 'stretch',
+    materials: []
+  };
+}
+
+function defaultMaterial(){
+  return {
+    id: 0,
+    imageData: '',
+    natW: 0, natH: 0,
+    x: 50, y: 50,    // 百分比位置 0-100
+    scale: 1,
+    rotate: 0
+  };
+}
+
+var state = {
+  currentSide: 'ta',
+  selector: '.yoww-bubble',
+  ta: defaultBubble(),
+  me: defaultBubble(),
+  selectedMatId: null
+};
+
+// 初始化默认图（对方侧用默认SVG，我的侧是空的）
+state.ta.imageData = DEFAULT_IMG;
+state.ta.natW = 120;
+state.ta.natH = 120;
+
+loadState();
+
+/* ========== DOM 缓存 ========== */
+var $ = function(id){ return document.getElementById(id); };
+var els = {
+  // tab
+  tabBtns: document.querySelectorAll('.tab-btn'),
+  sideLabel: $('sideLabel'),
+  flipHint: $('flipHint'),
+  flipBtn: $('flipBtn'),
+  // 上传
+  uploadArea: $('uploadArea'),
+  hasImgArea: $('hasImgArea'),
+  uploadThumb: $('uploadThumb'),
+  uploadName: $('uploadName'),
+  uploadSize: $('uploadSize'),
+  btnRemoveImg: $('btnRemoveImg'),
+  fileInput: $('fileInput'),
+  urlInput: $('urlInput'),
+  btnUrlImport: $('btnUrlImport'),
+  // 切图台
+  slicer: $('slicer'),
+  canvas: $('canvas'),
+  slicerImg: $('slicerImg'),
+  rCenter: $('rCenter'),
+  imgInfo: $('imgInfo'),
+  // 切割quad
+  sliceQuad: $('sliceQuad'),
+  padQuad: $('padQuad'),
+  // 样式
+  scaleRange: $('scaleRange'),
+  scaleVal: $('scaleVal'),
+  fontColor: $('fontColor'),
+  fontSize: $('fontSize'),
+  repeatMode: $('repeatMode'),
+  btnLinkPad: $('btnLinkPad'),
+  // 预览
+  previewStage: $('previewStage'),
+  flowList: $('flowList'),
+  taBubbles: document.querySelectorAll('.ta-bubble'),
+  meBubbles: document.querySelectorAll('.me-bubble'),
+  btnChatView: $('btnChatView'),
+  btnResetAll: $('btnResetAll'),
+  // 素材
+  btnMatUpload: $('btnMatUpload'),
+  btnMatUrl: $('btnMatUrl'),
+  matFileInput: $('matFileInput'),
+  materialList: $('materialList'),
+  materialCountHint: $('materialCountHint'),
+  materialControls: $('materialControls'),
+  matScaleRange: $('matScaleRange'),
+  matScaleVal: $('matScaleVal'),
+  matRotateRange: $('matRotateRange'),
+  matRotateVal: $('matRotateVal'),
+  btnMatUp: $('btnMatUp'),
+  btnMatDown: $('btnMatDown'),
+  btnMatCopy: $('btnMatCopy'),
+  btnMatDelete: $('btnMatDelete'),
+  // 代码
+  selectorInput: $('selectorInput'),
+  codePre: $('codePre'),
+  btnCopyCSS: $('btnCopyCSS'),
+  btnDownloadCSS: $('btnDownloadCSS'),
+  // 预设
+  presetSel: $('presetSel'),
+  presetName: $('presetName'),
+  presetMsg: $('presetMsg'),
+  btnPresetSave: $('btnPresetSave'),
+  btnPresetDel: $('btnPresetDel'),
+  // 教程
+  tutorialOverlay: $('tutorialOverlay'),
+  tutorialSkip: null,
+  // toast
+  toast: $('toast')
+};
+
+var goodSrc = DEFAULT_IMG; // 最后一张成功加载的图
+
+/* ========== 工具函数 ========== */
+function current(){ return state[state.currentSide]; }
+function other(){ return state[state.currentSide === 'ta' ? 'me' : 'ta']; }
+function otherSide(){ return state.currentSide === 'ta' ? 'me' : 'ta'; }
+function clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+
+function showToast(msg, duration){
+  duration = duration || 1500;
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(function(){ els.toast.classList.remove('show'); }, duration);
+}
+
+/* ========== Tab 切换 ========== */
+function switchSide(side){
+  state.currentSide = side;
+  els.tabBtns.forEach(function(b){
+    b.classList.toggle('active', b.dataset.side === side);
+  });
+  els.sideLabel.textContent = side === 'ta' ? '对方' : '我的';
+  els.flipHint.textContent = side === 'ta' ? '对方 → 我的' : '我的 → 对方';
+
+  // 检查选中素材
+  var c = current();
+  if(state.selectedMatId){
+    var found = false;
+    for(var i = 0; i < c.materials.length; i++){
+      if(c.materials[i].id === state.selectedMatId){ found = true; break; }
+    }
+    if(!found) state.selectedMatId = c.materials.length ? c.materials[0].id : null;
+  }
+
+  renderAll();
+  saveStateDebounced();
+}
+
+els.tabBtns.forEach(function(btn){
+  btn.addEventListener('click', function(){ switchSide(this.dataset.side); });
+});
+
+/* ========== 图片上传 ========== */
+els.uploadArea.addEventListener('click', function(){ els.fileInput.click(); });
+els.hasImgArea.addEventListener('click', function(e){
+  if(e.target.closest('#btnRemoveImg')) return;
+  els.fileInput.click();
+});
+
+els.btnRemoveImg.addEventListener('click', function(e){
+  e.stopPropagation();
+  var c = current();
+  c.imageData = '';
+  c.natW = 0; c.natH = 0;
+  c.url = '';
+  c.materials = [];
+  state.selectedMatId = null;
+  els.urlInput.value = '';
+  renderAll();
+  saveStateDebounced();
+  showToast('已删除');
+});
+
+els.fileInput.addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    loadImageData(ev.target.result, f.name);
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+});
+
+els.btnUrlImport.addEventListener('click', function(){
+  var url = els.urlInput.value.trim();
+  if(!url) return;
+  loadImageFromUrl(url);
+});
+els.urlInput.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    els.btnUrlImport.click();
+  }
+});
+
+function loadImageFromUrl(url){
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function(){
+    // 转成 dataURL 方便预览和存预设
+    try{
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      var dataUrl = canvas.toDataURL('image/png');
+      loadImageData(dataUrl, url.split('/').pop() || 'image.png');
+    }catch(err){
+      // 跨域失败，直接用URL（预览可能加载不了但CSS还是输出URL）
+      var c = current();
+      c.url = url;
+      c.imageData = url;
+      c.natW = img.naturalWidth || 120;
+      c.natH = img.naturalHeight || 120;
+      goodSrc = url;
+      afterImageLoaded();
+      showToast('URL已导入（预览可能受跨域限制）');
+    }
+  };
+  img.onerror = function(){
+    showToast('图片加载失败');
+  };
+  img.src = url;
+}
+
+function loadImageData(dataUrl, name){
+  var img = new Image();
+  img.onload = function(){
+    var c = current();
+    c.imageData = dataUrl;
+    c.natW = img.naturalWidth;
+    c.natH = img.naturalHeight;
+    c.url = ''; // 本地图清空url
+    goodSrc = dataUrl;
+    afterImageLoaded(name);
+  };
+  img.onerror = function(){
+    showToast('图片加载失败');
+  };
+  img.src = dataUrl;
+}
+
+function afterImageLoaded(name){
+  var c = current();
+  // 自动倍率
+  autoScale();
+  // 自动内边距
+  relinkPad();
+  // 刷新切割范围
+  refreshSliceRanges();
+
+  renderAll();
+  saveStateDebounced();
+  if(name) showToast('已上传：' + name);
+}
+
+/* ========== 切图台布局 ========== */
+function layoutSlicer(){
+  var c = current();
+  if(!c.natW || !c.natH) return;
+  var box = els.slicer.getBoundingClientRect();
+  var pad = 16;
+  var maxW = box.width - pad * 2;
+  var maxH = box.height - pad * 2;
+  var w = maxW, h = w * c.natH / c.natW;
+  if(h > maxH){ h = maxH; w = h * c.natW / c.natH; }
+  els.canvas.style.width = w + 'px';
+  els.canvas.style.height = h + 'px';
+  els.canvas.style.left = (box.width - w)/2 + 'px';
+  els.canvas.style.top = (box.height - h)/2 + 'px';
+}
+
+/* ========== 切割线渲染 ========== */
+function renderSlicer(){
+  var c = current();
+  var s = c.slice;
+  if(!c.natW || !c.natH){
+    els.slicerImg.src = '';
+    els.imgInfo.textContent = '上传图片后开始切割';
+    return;
+  }
+  els.slicerImg.src = goodSrc === c.imageData ? c.imageData : goodSrc;
+
+  var pct = function(v, total){ return (v/total*100) + '%'; };
+  $('line-t').style.top = pct(s.t, c.natH);
+  $('line-b').style.top = pct(c.natH - s.b, c.natH);
+  $('line-l').style.left = pct(s.l, c.natW);
+  $('line-r').style.left = pct(c.natW - s.r, c.natW);
+
+  EDGES.forEach(function(e){
+    $('line-'+e[0]).dataset.label = e[1] + ' ' + s[e[0]];
+  });
+
+  els.rCenter.style.inset =
+    pct(s.t, c.natH) + ' ' + pct(s.r, c.natW) + ' ' +
+    pct(s.b, c.natH) + ' ' + pct(s.l, c.natW);
+
+  els.imgInfo.textContent =
+    '原图 ' + c.natW + ' × ' + c.natH + ' px　·　可拉伸区 ' +
+    Math.max(0, c.natW - s.l - s.r) + ' × ' +
+    Math.max(0, c.natH - s.t - s.b) + ' px';
+
+  // 上传区信息
+  els.uploadArea.style.display = 'none';
+  els.hasImgArea.style.display = 'flex';
+  els.uploadThumb.src = goodSrc;
+  els.uploadName.textContent = state.currentSide === 'ta' ? '对方气泡' : '我的气泡';
+  els.uploadSize.textContent = c.natW + ' × ' + c.natH + ' px';
+}
+
+/* ========== 红线拖拽 ========== */
+EDGES.forEach(function(e){
+  var k = e[0], line = $('line-' + k);
+  line.addEventListener('pointerdown', function(ev){
+    ev.preventDefault();
+    try{ line.setPointerCapture(ev.pointerId); }catch(err){}
+    var move = function(m){
+      var r = els.canvas.getBoundingClientRect();
+      if(!r.width || !r.height) return;
+      var c = current();
+      var x = (m.clientX - r.left) / r.width * c.natW;
+      var y = (m.clientY - r.top) / r.height * c.natH;
+      var v = k === 't' ? y : k === 'b' ? c.natH - y : k === 'l' ? x : c.natW - x;
+      setSlice(k, v);
+    };
+    var up = function(){
+      line.removeEventListener('pointermove', move);
+      line.removeEventListener('pointerup', up);
+      line.removeEventListener('pointercancel', up);
+    };
+    line.addEventListener('pointermove', move);
+    line.addEventListener('pointerup', up);
+    line.addEventListener('pointercancel', up);
+  });
+});
+
+/* ========== 切割值 ========== */
+function sliceMax(k){
+  var s = current().slice;
+  var c = current();
+  return k === 't' ? Math.max(0, c.natH - s.b - 1)
+       : k === 'b' ? Math.max(0, c.natH - s.t - 1)
+       : k === 'l' ? Math.max(0, c.natW - s.r - 1)
+                   : Math.max(0, c.natW - s.l - 1);
+}
+
+function refreshSliceRanges(){
+  EDGES.forEach(function(e){
+    var k = e[0], max = sliceMax(k);
+    var r = $('slice-r-' + k), n = $('slice-n-' + k);
+    if(r) r.max = max;
+    if(n) n.max = max;
+    if(current().slice[k] > max) setSlice(k, max, true);
+  });
+}
+
+function setSlice(k, v, quiet){
+  current().slice[k] = clamp(Math.round(Number(v) || 0), 0, sliceMax(k));
+  autoScale();
+  relinkPad();
+  if(!quiet){
+    refreshSliceRanges();
+    syncQuadInputs();
+    render();
+    saveStateDebounced();
+  }
+}
+
+function setPad(k, v){
+  current().pad[k] = clamp(Math.round(Number(v) || 0), 0, 200);
+  syncQuadInputs();
+  render();
+  saveStateDebounced();
+}
+
+/* ========== 自动倍率 ========== */
+function autoScale(){
+  var c = current();
+  if(!c.scaleAuto) return;
+  if(!c.natW) return;
+  var s = c.slice;
+  var sorted = [s.t, s.r, s.b, s.l].sort(function(a, b){ return b - a; });
+  var base = sorted[1] || sorted[0] || 1;
+  c.scale = clamp(Math.round(AIM_EDGE / base * 20) / 20, 0.1, 2);
+  els.scaleRange.value = c.scale;
+}
+
+/* ========== padding跟随 ========== */
+function relinkPad(){
+  var c = current();
+  if(!c.padLinked) return;
+  var k = c.scale;
+  EDGES.forEach(function(e){
+    var key = e[0];
+    var floor = (key === 't' || key === 'b') ? 8 : 12;
+    c.pad[key] = clamp(Math.round(current().slice[key] * k), floor, 28);
+  });
+}
+
+/* ========== Quad 控件 ========== */
+function buildQuad(host, group, max, onInput){
+  host.innerHTML = '';
+  EDGES.forEach(function(e){
+    var k = e[0];
+    var wrap = document.createElement('div');
+    wrap.className = 'quad-item';
+    wrap.innerHTML =
+      '<div class="num-row"><span>' + e[1] + '</span>' +
+      '<input type="number" id="' + group + '-n-' + k + '" min="0" max="' + max + '" step="1"></div>' +
+      '<input type="range" id="' + group + '-r-' + k + '" min="0" max="' + max + '" step="1">';
+    host.appendChild(wrap);
+    wrap.querySelector('input[type=range]').addEventListener('input', function(){ onInput(k, this.value); });
+    wrap.querySelector('input[type=number]').addEventListener('input', function(){ onInput(k, this.value); });
+  });
+}
+
+function syncQuadInputs(){
+  var c = current();
+  EDGES.forEach(function(e){
+    var k = e[0];
+    ['slice','pad'].forEach(function(g){
+      var n = $(g + '-n-' + k), r = $(g + '-r-' + k);
+      if(n) n.value = c[g][k];
+      if(r) r.value = c[g][k];
+    });
+  });
+  els.scaleVal.textContent = c.scale.toFixed(2);
+}
+
+/* ========== 预览渲染 ========== */
+var lastProps = [];
+
+function getBubbleDeclarations(side){
+  var cfg = state[side];
+  if(!cfg.imageData && !cfg.natW){
+    // 返回默认样式
+    return [
+      ['background', '#e5e5ea'],
+      ['border-radius', '18px'],
+      ['padding', '8px 14px'],
+      ['color', '#000'],
+      ['font-size', cfg.fontSize + 'px']
+    ];
+  }
+  var s = cfg.slice;
+  var k = cfg.scale;
+  var px = function(n){ return Math.round(n * k) + 'px'; };
+  var src = 'url("' + cfg.imageData + '")';
+  var sliceVal = s.t + ' ' + s.r + ' ' + s.b + ' ' + s.l + ' fill';
+  var widthVal = px(s.t) + ' ' + px(s.r) + ' ' + px(s.b) + ' ' + px(s.l);
+  var padT = Math.round(cfg.pad.t * k);
+  var padR = Math.round(cfg.pad.r * k);
+  var padB = Math.round(cfg.pad.b * k);
+  var padL = Math.round(cfg.pad.l * k);
+
+  var d = [];
+  // 清默认
+  d.push(['background', 'transparent']);
+  d.push(['box-shadow', 'none']);
+  d.push(['border-radius', '0']);
+  // 九宫格
+  d.push(['border-style', 'solid']);
+  d.push(['border-width', '0']);
+  d.push(['border-color', 'transparent']);
+  d.push(['border-image-source', src]);
+  d.push(['border-image-slice', sliceVal]);
+  d.push(['border-image-width', widthVal]);
+  d.push(['border-image-repeat', cfg.repeat]);
+  d.push(['border-image-outset', '0']);
+  // padding
+  d.push(['padding', padT + 'px ' + padR + 'px ' + padB + 'px ' + padL + 'px']);
+  // 文字
+  d.push(['color', cfg.fontColor]);
+  d.push(['font-size', cfg.fontSize + 'px']);
+  d.push(['line-height', '1.5']);
+  // 让气泡按内容宽
+  d.push(['display', 'inline-block']);
+  d.push(['width', 'auto']);
+  d.push(['max-width', '100%']);
+  d.push(['position', 'relative']);
+
+  return d;
+}
+
+function renderPreview(){
+  // 清除旧属性
+  var allBubbles = document.querySelectorAll('.chat-bubble');
+  allBubbles.forEach(function(b){
+    lastProps.forEach(function(prop){ b.style.removeProperty(prop); });
+  });
+  lastProps = [];
+
+  // 应用对方气泡样式
+  var taDecs = getBubbleDeclarations('ta');
+  els.taBubbles.forEach(function(b){
+    taDecs.forEach(function(d){
+      b.style.setProperty(d[0], d[1]);
+      if(lastProps.indexOf(d[0]) < 0) lastProps.push(d[0]);
+    });
+  });
+
+  // 应用我的气泡样式
+  var meDecs = getBubbleDeclarations('me');
+  els.meBubbles.forEach(function(b){
+    meDecs.forEach(function(d){
+      b.style.setProperty(d[0], d[1]);
+      if(lastProps.indexOf(d[0]) < 0) lastProps.push(d[0]);
+    });
+  });
+
+  // 渲染装饰素材
+  renderMaterials();
+}
+
+/* ========== 装饰素材 ========== */
+function renderMaterials(){
+  // 先清空所有素材
+  document.querySelectorAll('.bubble-material').forEach(function(el){ el.remove(); });
+
+  // 渲染每侧的素材
+  ['ta', 'me'].forEach(function(side){
+    var cfg = state[side];
+    if(!cfg.materials || !cfg.materials.length) return;
+
+    var bubbles = side === 'ta' ? els.taBubbles : els.meBubbles;
+    var k = cfg.scale;
+
+    bubbles.forEach(function(bubble, idx){
+      var wrap = bubble.parentElement; // chat-bubble-wrap
+      cfg.materials.forEach(function(m, matIdx){
+        if(!m.imageData) return;
+        var el = document.createElement('div');
+        el.className = 'bubble-material';
+        el.dataset.matId = m.id;
+        el.dataset.side = side;
+        el.dataset.bubbleIdx = idx;
+        if(side === state.currentSide && m.id === state.selectedMatId){
+          el.classList.add('mat-selected');
+        }
+        // 位置基于气泡wrap的百分比
+        var w = Math.round(m.natW * m.scale * k);
+        var h = Math.round(m.natH * m.scale * k);
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.left = 'calc(' + m.x + '% - ' + (w/2) + 'px)';
+        el.style.top = 'calc(' + m.y + '% - ' + (h/2) + 'px)';
+        el.style.transform = 'rotate(' + m.rotate + 'deg)';
+        el.style.zIndex = matIdx + 1;
+
+        var img = document.createElement('img');
+        img.src = m.imageData;
+        img.draggable = false;
+        el.appendChild(img);
+
+        wrap.appendChild(el);
+      });
+    });
+  });
+
+  // 绑定拖拽
+  initMaterialDrag();
+}
+
+// 素材拖拽
+var _matDrag = null;
+function initMaterialDrag(){
+  var mats = document.querySelectorAll('.bubble-material');
+  mats.forEach(function(el){
+    // 移除旧监听（通过克隆）
+    var newEl = el.cloneNode(true);
+    el.parentNode.replaceChild(newEl, el);
+    el = newEl;
+
+    el.addEventListener('pointerdown', function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      var matId = Number(this.dataset.matId);
+      var side = this.dataset.side;
+      var bubbleIdx = Number(this.dataset.bubbleIdx);
+
+      // 只允许拖拽当前侧第一个气泡的素材
+      if(side !== state.currentSide || bubbleIdx !== 0) return;
+
+      state.selectedMatId = matId;
+      renderMaterialList();
+      syncMaterialControls();
+      renderPreview(); // 刷新选中状态
+
+      var wrap = this.parentElement;
+      var rect = wrap.getBoundingClientRect();
+      _matDrag = {
+        matId: matId,
+        parentRect: rect,
+        startX: ev.clientX,
+        startY: ev.clientY
+      };
+
+      var m = getSelectedMaterial();
+      if(m){
+        _matDrag.startMatX = m.x;
+        _matDrag.startMatY = m.y;
+      }
+
+      try{ this.setPointerCapture(ev.pointerId); }catch(err){}
+    });
+
+    el.addEventListener('pointermove', function(ev){
+      if(!_matDrag || _matDrag.matId !== Number(this.dataset.matId)) return;
+      ev.preventDefault();
+
+      var dx = ev.clientX - _matDrag.startX;
+      var dy = ev.clientY - _matDrag.startY;
+
+      var pctX = (dx / _matDrag.parentRect.width) * 100;
+      var pctY = (dy / _matDrag.parentRect.height) * 100;
+
+      var m = getSelectedMaterial();
+      if(m){
+        m.x = clamp(_matDrag.startMatX + pctX, 0, 100);
+        m.y = clamp(_matDrag.startMatY + pctY, 0, 100);
+        // 只更新位置，不重绘整个列表（避免拖拽中断）
+        updateMaterialPositions();
+      }
+    });
+
+    function endDrag(ev){
+      if(_matDrag){
+        _matDrag = null;
+        saveStateDebounced();
+        renderMaterialList();
+      }
+    }
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+  });
+}
+
+function updateMaterialPositions(){
+  var m = getSelectedMaterial();
+  if(!m) return;
+  var side = state.currentSide;
+  var k = state[side].scale;
+  var w = Math.round(m.natW * m.scale * k);
+  var h = Math.round(m.natH * m.scale * k);
+
+  document.querySelectorAll('.bubble-material[data-side="' + side + '"][data-mat-id="' + m.id + '"]').forEach(function(el){
+    el.style.left = 'calc(' + m.x + '% - ' + (w/2) + 'px)';
+    el.style.top = 'calc(' + m.y + '% - ' + (h/2) + 'px)';
+  });
+}
+
+function getSelectedMaterial(){
+  var c = current();
+  for(var i = 0; i < c.materials.length; i++){
+    if(c.materials[i].id === state.selectedMatId) return c.materials[i];
+  }
+  return null;
+}
+
+function getSelectedMaterialIndex(){
+  var c = current();
+  for(var i = 0; i < c.materials.length; i++){
+    if(c.materials[i].id === state.selectedMatId) return i;
+  }
+  return -1;
+}
+
+function renderMaterialList(){
+  var c = current();
+  var mats = c.materials;
+  els.materialCountHint.textContent = mats.length + ' / ' + MAX_MATERIALS;
+
+  if(!mats.length){
+    els.materialList.innerHTML = '<div class="material-empty">还没有素材，点上方按钮添加</div>';
+    els.materialControls.classList.remove('show');
+    return;
+  }
+
+  var html = '';
+  for(var i = 0; i < mats.length; i++){
+    var m = mats[i];
+    html += '<div class="material-item' + (m.id === state.selectedMatId ? ' active' : '') + '" data-mat-id="' + m.id + '">' +
+            '<img src="' + m.imageData + '" alt="">' +
+            '<div class="mat-del" data-mat-id="' + m.id + '">×</div>' +
+            '</div>';
+  }
+  els.materialList.innerHTML = html;
+
+  // 绑定点击
+  els.materialList.querySelectorAll('.material-item').forEach(function(item){
+    item.addEventListener('click', function(e){
+      if(e.target.classList.contains('mat-del')){
+        e.stopPropagation();
+        var id = Number(e.target.dataset.matId);
+        deleteMaterial(id);
+        return;
+      }
+      var id = Number(this.dataset.matId);
+      state.selectedMatId = id;
+      renderMaterialList();
+      syncMaterialControls();
+      renderPreview();
+    });
+  });
+
+  els.materialControls.classList.toggle('show', !!state.selectedMatId);
+}
+
+function syncMaterialControls(){
+  var m = getSelectedMaterial();
+  if(!m) return;
+  els.matScaleRange.value = m.scale;
+  els.matScaleVal.textContent = m.scale.toFixed(2) + 'x';
+  els.matRotateRange.value = m.rotate;
+  els.matRotateVal.textContent = m.rotate + '°';
+}
+
+// 素材上传
+els.btnMatUpload.addEventListener('click', function(){
+  if(current().materials.length >= MAX_MATERIALS){
+    showToast('最多只能添加 ' + MAX_MATERIALS + ' 个素材');
+    return;
+  }
+  els.matFileInput.click();
+});
+
+els.matFileInput.addEventListener('change', function(e){
+  var files = e.target.files;
+  if(!files || !files.length) return;
+  var remaining = MAX_MATERIALS - current().materials.length;
+  var count = Math.min(files.length, remaining);
+
+  for(var i = 0; i < count; i++){
+    (function(file){
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        addMaterialImage(ev.target.result);
+      };
+      reader.readAsDataURL(file);
+    })(files[i]);
+  }
+  e.target.value = '';
+});
+
+els.btnMatUrl.addEventListener('click', function(){
+  if(current().materials.length >= MAX_MATERIALS){
+    showToast('最多只能添加 ' + MAX_MATERIALS + ' 个素材');
+    return;
+  }
+  var url = prompt('请输入素材图片URL：');
+  if(!url) return;
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function(){
+    try{
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      addMaterialImage(canvas.toDataURL('image/png'));
+    }catch(err){
+      // 跨域也加上（用URL）
+      var m = defaultMaterial();
+      m.id = _matIdCounter++;
+      m.imageData = url;
+      m.natW = img.naturalWidth || 50;
+      m.natH = img.naturalHeight || 50;
+      current().materials.push(m);
+      state.selectedMatId = m.id;
+      renderAll();
+      saveStateDebounced();
+      showToast('素材已添加（跨域图片可能无法预览）');
+    }
+  };
+  img.onerror = function(){ showToast('图片加载失败'); };
+  img.src = url;
+});
+
+function addMaterialImage(dataUrl){
+  var c = current();
+  if(c.materials.length >= MAX_MATERIALS){
+    showToast('最多只能添加 ' + MAX_MATERIALS + ' 个素材');
+    return;
+  }
+  var img = new Image();
+  img.onload = function(){
+    var m = defaultMaterial();
+    m.id = _matIdCounter++;
+    m.imageData = dataUrl;
+    m.natW = img.naturalWidth;
+    m.natH = img.naturalHeight;
+    // 默认放在右上角附近
+    m.x = 80;
+    m.y = 20;
+    c.materials.push(m);
+    state.selectedMatId = m.id;
+    renderAll();
+    saveStateDebounced();
+  };
+  img.src = dataUrl;
+}
+
+function deleteMaterial(id){
+  var c = current();
+  for(var i = 0; i < c.materials.length; i++){
+    if(c.materials[i].id === id){
+      c.materials.splice(i, 1);
+      if(state.selectedMatId === id){
+        state.selectedMatId = c.materials.length ? c.materials[0].id : null;
+      }
+      renderAll();
+      saveStateDebounced();
+      return;
+    }
+  }
+}
+
+// 素材大小
+els.matScaleRange.addEventListener('input', function(){
+  var m = getSelectedMaterial();
+  if(!m) return;
+  m.scale = Number(this.value);
+  els.matScaleVal.textContent = m.scale.toFixed(2) + 'x';
+  renderPreview();
+});
+els.matScaleRange.addEventListener('change', function(){ saveStateDebounced(); });
+
+// 素材旋转
+els.matRotateRange.addEventListener('input', function(){
+  var m = getSelectedMaterial();
+  if(!m) return;
+  m.rotate = Number(this.value);
+  els.matRotateVal.textContent = m.rotate + '°';
+  renderPreview();
+});
+els.matRotateRange.addEventListener('change', function(){ saveStateDebounced(); });
+
+// 图层排序
+els.btnMatUp.addEventListener('click', function(){
+  var c = current();
+  var idx = getSelectedMaterialIndex();
+  if(idx < 0 || idx >= c.materials.length - 1) return;
+  var temp = c.materials[idx];
+  c.materials[idx] = c.materials[idx + 1];
+  c.materials[idx + 1] = temp;
+  renderAll();
+  saveStateDebounced();
+});
+
+els.btnMatDown.addEventListener('click', function(){
+  var c = current();
+  var idx = getSelectedMaterialIndex();
+  if(idx <= 0) return;
+  var temp = c.materials[idx];
+  c.materials[idx] = c.materials[idx - 1];
+  c.materials[idx - 1] = temp;
+  renderAll();
+  saveStateDebounced();
+});
+
+// 复制到对侧
+els.btnMatCopy.addEventListener('click', function(){
+  var c = current();
+  var o = other();
+  if(!c.materials.length){
+    showToast('当前侧没有素材');
+    return;
+  }
+  for(var i = 0; i < c.materials.length; i++){
+    if(o.materials.length >= MAX_MATERIALS) break;
+    var m = JSON.parse(JSON.stringify(c.materials[i]));
+    m.id = _matIdCounter++;
+    m.x = 100 - m.x; // 水平镜像
+    m.rotate = -m.rotate;
+    o.materials.push(m);
+  }
+  renderAll();
+  saveStateDebounced();
+  showToast('已复制到对侧');
+});
+
+els.btnMatDelete.addEventListener('click', function(){
+  if(state.selectedMatId){
+    deleteMaterial(state.selectedMatId);
+    showToast('已删除');
+  }
+});
+
+/* ========== 翻转复制 ========== */
+els.flipBtn.addEventListener('click', function(){
+  var from = current();
+  if(!from.imageData){
+    showToast('请先上传当前侧的气泡图');
+    return;
+  }
+  flipImageHorizontal(from.imageData, function(flippedData){
+    var to = other();
+    to.imageData = flippedData;
+    to.natW = from.natW;
+    to.natH = from.natH;
+    to.slice = { t: from.slice.t, r: from.slice.l, b: from.slice.b, l: from.slice.r };
+    to.pad = { t: from.pad.t, r: from.pad.l, b: from.pad.b, l: from.pad.r };
+    to.scale = from.scale;
+    to.scaleAuto = from.scaleAuto;
+    to.padLinked = from.padLinked;
+    to.fontSize = from.fontSize;
+    to.fontColor = from.fontColor;
+    to.repeat = from.repeat;
+
+    // 翻转素材
+    to.materials = [];
+    for(var i = 0; i < from.materials.length; i++){
+      var m = JSON.parse(JSON.stringify(from.materials[i]));
+      m.id = _matIdCounter++;
+      m.x = 100 - m.x;
+      m.rotate = -m.rotate;
+      to.materials.push(m);
+    }
+
+    renderAll();
+    saveStateDebounced();
+    var sideName = otherSide() === 'ta' ? '对方' : '我的';
+    showToast('已翻转到' + sideName + '气泡');
+    setTimeout(function(){ switchSide(otherSide()); }, 200);
+  });
+});
+
+function flipImageHorizontal(dataUrl, callback){
+  var img = new Image();
+  img.onload = function(){
+    var canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+    callback(canvas.toDataURL('image/png'));
+  };
+  img.src = dataUrl;
+}
+
+/* ========== CSS 生成 ========== */
+function generateBubbleCSS(side, selector){
+  var cfg = state[side];
+  if(!cfg.imageData || !cfg.natW){
+    return '/* ' + (side === 'ta' ? '对方' : '我的') + '气泡：未上传素材 */';
+  }
+  var s = cfg.slice;
+  var k = cfg.scale;
+  var px = function(n){ return Math.round(n * k) + 'px'; };
+  var src = 'url("' + cfg.imageData + '")';
+  var sliceVal = s.t + ' ' + s.r + ' ' + s.b + ' ' + s.l + ' fill';
+  var widthVal = px(s.t) + ' ' + px(s.r) + ' ' + px(s.b) + ' ' + px(s.l);
+  var padT = Math.round(cfg.pad.t * k);
+  var padR = Math.round(cfg.pad.r * k);
+  var padB = Math.round(cfg.pad.b * k);
+  var padL = Math.round(cfg.pad.l * k);
+
+  var lines = [];
+  lines.push(selector + ' {');
+  lines.push('  /* 清除默认气泡样式 */');
+  lines.push('  background: transparent !important;');
+  lines.push('  box-shadow: none !important;');
+  lines.push('  border-radius: 0 !important;');
+  lines.push('');
+  lines.push('  /* 九宫格气泡 */');
+  lines.push('  border-style: solid !important;');
+  lines.push('  border-width: 0 !important;');
+  lines.push('  border-color: transparent !important;');
+  lines.push('  border-image-source: ' + src + ' !important;');
+  lines.push('  border-image-slice: ' + sliceVal + ' !important;');
+  lines.push('  border-image-width: ' + widthVal + ' !important;');
+  lines.push('  border-image-repeat: ' + cfg.repeat + ' !important;');
+  lines.push('  border-image-outset: 0 !important;');
+  lines.push('');
+  lines.push('  /* 内容内边距 */');
+  lines.push('  padding: ' + padT + 'px ' + padR + 'px ' + padB + 'px ' + padL + 'px !important;');
+  lines.push('');
+  lines.push('  /* 文字样式 */');
+  lines.push('  color: ' + cfg.fontColor + ' !important;');
+  lines.push('  font-size: ' + cfg.fontSize + 'px !important;');
+  lines.push('  line-height: 1.5 !important;');
+  lines.push('');
+  lines.push('  /* 让气泡按内容宽度自适应 */');
+  lines.push('  display: inline-block !important;');
+  lines.push('  width: auto !important;');
+  lines.push('  max-width: 75% !important;');
+  lines.push('  position: relative !important;');
+  lines.push('}');
+
+  // 素材CSS
+  if(cfg.materials && cfg.materials.length){
+    lines.push('');
+    lines.push('/* ===== 装饰素材 ===== */');
+    var bgImages = [];
+    var bgPositions = [];
+    var bgSizes = [];
+    var bgRepeats = [];
+
+    for(var i = 0; i < cfg.materials.length; i++){
+      var m = cfg.materials[i];
+      var w = Math.round(m.natW * m.scale * k);
+      var h = Math.round(m.natH * m.scale * k);
+      bgImages.push('url("' + m.imageData + '")');
+      bgPositions.push(m.x + '% ' + m.y + '%');
+      bgSizes.push(w + 'px ' + h + 'px');
+      bgRepeats.push('no-repeat');
+    }
+
+    lines.push(selector + ' {');
+    lines.push('  background-image: ' + bgImages.join(', ') + ' !important;');
+    lines.push('  background-position: ' + bgPositions.join(', ') + ' !important;');
+    lines.push('  background-size: ' + bgSizes.join(', ') + ' !important;');
+    lines.push('  background-repeat: ' + bgRepeats.join(', ') + ' !important;');
+    lines.push('  background-origin: border-box !important;');
+    lines.push('}');
+
+    // 旋转提示
+    var hasRotate = false;
+    for(var j = 0; j < cfg.materials.length; j++){
+      if(cfg.materials[j].rotate !== 0){ hasRotate = true; break; }
+    }
+    if(hasRotate){
+      lines.push('');
+      lines.push('/* 注意：有素材设置了旋转角度 */');
+      lines.push('/* 纯背景图方式不支持单个图层旋转，如需旋转请使用伪元素或自定义HTML方式 */');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function renderCode(){
+  var selector = (state.selector || '.yoww-bubble').trim();
+  // 纯类名自动补点
+  if(/^[A-Za-z_][\w-]*$/.test(selector)) selector = '.' + selector;
+
+  var taCSS = generateBubbleCSS('ta', selector + '.ta, ' + selector + '.other');
+  var meCSS = generateBubbleCSS('me', selector + '.me, ' + selector + '.self');
+
+  var full = [
+    '/* =======================================================',
+    '   Ann · 曲曲机气泡生成器 - 生成的CSS',
+    '   生成时间：' + new Date().toLocaleString('zh-CN'),
+    '   ======================================================= */',
+    '',
+    '/* ---------- 对方气泡 ---------- */',
+    taCSS,
+    '',
+    '/* ---------- 我的气泡 ---------- */',
+    meCSS
+  ].join('\n');
+
+  els.codePre.textContent = full;
+}
+
+/* ========== 复制/下载 ========== */
+els.btnCopyCSS.addEventListener('click', function(){
+  var text = els.codePre.textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      showToast('已复制 ✓');
+    }, function(){ fallbackCopy(text); });
+  } else {
+    fallbackCopy(text);
+  }
+});
+
+function fallbackCopy(text){
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  showToast(ok ? '已复制 ✓' : '复制失败，请手动选中');
+}
+
+els.btnDownloadCSS.addEventListener('click', function(){
+  var blob = new Blob([els.codePre.textContent], { type: 'text/css' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bubble.css';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+});
+
+els.selectorInput.addEventListener('input', function(){
+  state.selector = this.value;
+  renderCode();
+  saveStateDebounced();
+});
+
+/* ========== 样式控件绑定 ========== */
+els.scaleRange.addEventListener('input', function(){
+  var c = current();
+  c.scale = Number(this.value);
+  c.scaleAuto = false;
+  relinkPad();
+  syncQuadInputs();
+  render();
+  saveStateDebounced();
+});
+
+els.fontColor.addEventListener('input', function(){
+  current().fontColor = this.value;
+  render();
+  saveStateDebounced();
+});
+
+els.fontSize.addEventListener('input', function(){
+  var v = parseInt(this.value) || 14;
+  current().fontSize = clamp(v, 10, 24);
+  render();
+  saveStateDebounced();
+});
+
+els.repeatMode.addEventListener('change', function(){
+  current().repeat = this.value;
+  render();
+  saveStateDebounced();
+});
+
+els.btnLinkPad.addEventListener('click', function(){
+  var c = current();
+  c.padLinked = !c.padLinked;
+  this.classList.toggle('on', c.padLinked);
+  this.textContent = '跟着边角走：' + (c.padLinked ? '开' : '关');
+  if(c.padLinked){
+    relinkPad();
+    syncQuadInputs();
+  }
+  render();
+  saveStateDebounced();
+});
+
+/* ========== 重置 ========== */
+els.btnResetAll.addEventListener('click', function(){
+  if(!confirm('确定要重置当前侧的所有参数吗？')) return;
+  var c = current();
+  var keepImg = c.imageData;
+  var keepW = c.natW;
+  var keepH = c.natH;
+  var keepUrl = c.url;
+  var keepMats = c.materials;
+
+  var def = defaultBubble();
+  for(var key in def){
+    if(def.hasOwnProperty(key)){
+      c[key] = JSON.parse(JSON.stringify(def[key]));
+    }
+  }
+  c.imageData = keepImg;
+  c.natW = keepW;
+  c.natH = keepH;
+  c.url = keepUrl;
+  c.materials = keepMats;
+
+  autoScale();
+  relinkPad();
+  refreshSliceRanges();
+  syncQuadInputs();
+  els.fontColor.value = c.fontColor;
+  els.fontSize.value = c.fontSize;
+  els.repeatMode.value = c.repeat;
+  els.btnLinkPad.classList.toggle('on', c.padLinked);
+  els.btnLinkPad.textContent = '跟着边角走：' + (c.padLinked ? '开' : '关');
+  render();
+  saveStateDebounced();
+  showToast('已重置');
+});
+
+/* ========== 预设 ========== */
+var presets = loadPresets();
+
+function loadPresets(){
+  try{
+    var a = JSON.parse(localStorage.getItem(PRESET_KEY));
+    return Array.isArray(a) ? a : [];
+  }catch(e){ return []; }
+}
+
+function writePresets(){
+  try{
+    localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+    return true;
+  }catch(e){ return false; }
+}
+
+function renderPresets(){
+  var sel = els.presetSel;
+  sel.innerHTML = '';
+  var head = document.createElement('option');
+  head.value = '';
+  head.textContent = presets.length ? '— 选择预设（共 ' + presets.length + ' 条）—' : '— 还没存过预设 —';
+  sel.appendChild(head);
+  presets.forEach(function(p, i){
+    var o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = p.name + (p.conf ? ' [含参数]' : '');
+    sel.appendChild(o);
+  });
+}
+
+function currentConf(){
+  return {
+    selector: state.selector,
+    ta: sanitizeConf(state.ta),
+    me: sanitizeConf(state.me)
+  };
+}
+
+function sanitizeConf(c){
+  var mats = [];
+  if(c.materials){
+    for(var i = 0; i < c.materials.length; i++){
+      var m = c.materials[i];
+      mats.push({
+        id: m.id, natW: m.natW, natH: m.natH,
+        x: m.x, y: m.y, scale: m.scale, rotate: m.rotate,
+        imageData: m.imageData && m.imageData.length < MAX_IMG ? m.imageData : ''
+      });
+    }
+  }
+  return {
+    imageData: c.imageData && c.imageData.length < MAX_IMG ? c.imageData : '',
+    natW: c.natW, natH: c.natH,
+    url: c.url,
+    slice: JSON.parse(JSON.stringify(c.slice)),
+    pad: JSON.parse(JSON.stringify(c.pad)),
+    scale: c.scale, scaleAuto: c.scaleAuto,
+    padLinked: c.padLinked,
+    fontSize: c.fontSize, fontColor: c.fontColor,
+    repeat: c.repeat,
+    materials: mats
+  };
+}
+
+function applyPreset(p){
+  if(p.selector){
+    state.selector = p.selector;
+    els.selectorInput.value = p.selector;
+  }
+  if(p.ta) applyConf(p.ta, 'ta');
+  if(p.me) applyConf(p.me, 'me');
+  renderAll();
+  saveStateDebounced();
+}
+
+function applyConf(conf, side){
+  var c = state[side];
+  c.imageData = conf.imageData || '';
+  c.natW = conf.natW || 0;
+  c.natH = conf.natH || 0;
+  c.url = conf.url || '';
+  if(conf.slice) c.slice = JSON.parse(JSON.stringify(conf.slice));
+  if(conf.pad) c.pad = JSON.parse(JSON.stringify(conf.pad));
+  c.scale = conf.scale || 1;
+  c.scaleAuto = conf.scaleAuto !== false;
+  c.padLinked = conf.padLinked !== false;
+  c.fontSize = conf.fontSize || 14;
+  c.fontColor = conf.fontColor || '#ffffff';
+  c.repeat = conf.repeat || 'stretch';
+  c.materials = conf.materials ? JSON.parse(JSON.stringify(conf.materials)) : [];
+
+  // 更新ID计数器
+  if(c.materials){
+    for(var i = 0; i < c.materials.length; i++){
+      if(c.materials[i].id >= _matIdCounter) _matIdCounter = c.materials[i].id + 1;
+    }
+  }
+}
+
+els.presetSel.addEventListener('change', function(){
+  var p = presets[Number(this.value)];
+  if(!p) return;
+  applyPreset(p);
+  els.presetName.value = p.name;
+  els.presetMsg.textContent = '已套用：' + p.name;
+  setTimeout(function(){ els.presetMsg.textContent = ''; }, 2000);
+});
+
+els.btnPresetSave.addEventListener('click', function(){
+  var name = els.presetName.value.trim();
+  if(!name){
+    els.presetMsg.textContent = '请输入预设名';
+    els.presetMsg.className = 'preset-msg err';
+    return;
+  }
+  var pr = { name: name, conf: currentConf() };
+  var idx = -1;
+  for(var i = 0; i < presets.length; i++){
+    if(presets[i].name === name){ idx = i; break; }
+  }
+  if(idx >= 0){
+    if(!confirm('覆盖预设「' + name + '」？')) return;
+    presets[idx] = pr;
+  } else {
+    presets.push(pr);
+    idx = presets.length - 1;
+  }
+  if(writePresets()){
+    els.presetMsg.textContent = '已保存：' + name;
+    els.presetMsg.className = 'preset-msg';
+    renderPresets();
+    els.presetSel.value = String(idx);
+  } else {
+    presets.splice(idx, 1);
+    els.presetMsg.textContent = '存不下了：存储已满';
+    els.presetMsg.className = 'preset-msg err';
+  }
+  setTimeout(function(){ els.presetMsg.textContent = ''; }, 2500);
+});
+
+els.btnPresetDel.addEventListener('click', function(){
+  var i = Number(els.presetSel.value);
+  var p = presets[i];
+  if(!p){
+    els.presetMsg.textContent = '请先选择要删除的预设';
+    els.presetMsg.className = 'preset-msg err';
+    return;
+  }
+  if(!confirm('删除预设「' + p.name + '」？')) return;
+  presets.splice(i, 1);
+  writePresets();
+  renderPresets();
+  els.presetMsg.textContent = '已删除';
+  setTimeout(function(){ els.presetMsg.textContent = ''; }, 2000);
+});
+
+/* ========== 状态持久化 ========== */
+var _saveTimer = null;
+function saveStateDebounced(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveState, 300);
+}
+
+function saveState(){
+  var s = {
+    currentSide: state.currentSide,
+    selector: state.selector,
+    ta: sanitizeConf(state.ta),
+    me: sanitizeConf(state.me),
+    selectedMatId: state.selectedMatId
+  };
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  }catch(e){}
+}
+
+function loadState(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    var s = JSON.parse(raw);
+    if(s.currentSide) state.currentSide = s.currentSide;
+    if(s.selector) state.selector = s.selector;
+    if(s.ta) applyConf(s.ta, 'ta');
+    if(s.me) applyConf(s.me, 'me');
+    if(s.selectedMatId) state.selectedMatId = s.selectedMatId;
+  }catch(e){}
+}
+
+/* ========== 教程 ========== */
+window.showTutorial = function(){
+  els.tutorialOverlay.classList.add('show');
+};
+window.hideTutorial = function(){
+  els.tutorialOverlay.classList.remove('show');
+  localStorage.setItem('annBubbleTutorialSeen', '1');
+};
+
+// 首次访问显示教程
+if(!localStorage.getItem('annBubbleTutorialSeen')){
+  setTimeout(showTutorial, 300);
+}
+
+/* ========== 总渲染 ========== */
+function render(){
+  renderSlicer();
+  renderPreview();
+  renderCode();
+}
+
+function renderAll(){
+  layoutSlicer();
+  renderSlicer();
+  syncQuadInputs();
+  renderMaterialList();
+  syncMaterialControls();
+  renderPreview();
+  renderCode();
+
+  // 同步控件值
+  var c = current();
+  els.scaleRange.value = c.scale;
+  els.scaleVal.textContent = c.scale.toFixed(2);
+  els.fontColor.value = c.fontColor;
+  els.fontSize.value = c.fontSize;
+  els.repeatMode.value = c.repeat;
+  els.btnLinkPad.classList.toggle('on', c.padLinked);
+  els.btnLinkPad.textContent = '跟着边角走：' + (c.padLinked ? '开' : '关');
+  els.selectorInput.value = state.selector;
+  els.urlInput.value = c.url;
+}
+
+/* ========== 初始化 ========== */
+buildQuad(els.sliceQuad, 'slice', 200, setSlice);
+buildQuad(els.padQuad, 'pad', 120, setPad);
+renderPresets();
+
+// 切换tab到当前
+els.tabBtns.forEach(function(b){
+  b.classList.toggle('active', b.dataset.side === state.currentSide);
+});
+els.sideLabel.textContent = state.currentSide === 'ta' ? '对方' : '我的';
+els.flipHint.textContent = state.currentSide === 'ta' ? '对方 → 我的' : '我的 → 对方';
+
+layoutSlicer();
+renderAll();
+
+// 窗口大小变化时重新布局切图台
+window.addEventListener('resize', function(){
+  layoutSlicer();
+});
+
+})();
+</script>
+</body>
+</html>
